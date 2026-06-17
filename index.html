@@ -8,12 +8,14 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script>tailwind.config = { darkMode: 'class' };</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <style>
   html,body{-webkit-tap-highlight-color:transparent}
   .tap{min-height:56px}
-  #video{width:100%;height:100%;object-fit:cover}
+  #qr-reader{width:100%;height:100%}
+  #qr-reader video{width:100%;height:100%;object-fit:cover}
+  #qr-reader img, #qr-reader button, #qr-reader select{display:none!important}
   .scanline{animation:scan 2s ease-in-out infinite}
   @keyframes scan{0%,100%{top:12%}50%{top:85%}}
   .fade-in{animation:fade .25s ease-out}
@@ -88,7 +90,7 @@
       <button onclick="stopScan();show('home')" class="text-sm text-slate-500">✕ Close</button>
     </div>
     <div class="relative aspect-[3/4] rounded-2xl overflow-hidden bg-black">
-      <video id="video" playsinline muted></video>
+      <div id="qr-reader"></div>
       <div class="absolute inset-0 pointer-events-none">
         <div class="absolute inset-x-8 top-[12%] bottom-[12%] border-2 border-white/70 rounded-xl"></div>
         <div class="scanline absolute inset-x-10 h-0.5 bg-red-500/80"></div>
@@ -291,7 +293,7 @@ const SEED_MASTER = [
 let OPERATOR = localStorage.getItem('wms_operator') || '';
 let sb = null, CLOUD = false;
 let currentProduct = null, currentPutawayRecord = null;
-let codeReader = null, scanControls = null, searchTimer = null;
+let searchTimer = null;
 let CURRENT_MODE = 'inward';
 
 /* Storage */
@@ -394,6 +396,8 @@ const MODE_META = {
   putaway: {label:'🔄 PUTAWAY', bg:'bg-indigo-600'},
   outward: {label:'📤 OUTWARD', bg:'bg-amber-500'}
 };
+let html5Qr = null;
+
 async function startScan(){
   const m=MODE_META[CURRENT_MODE]||MODE_META.inward;
   const badge=document.getElementById('modeBadge');
@@ -401,29 +405,42 @@ async function startScan(){
   document.getElementById('retryBtn').classList.add('hidden');
   document.getElementById('scanHint').textContent='Starting camera…';
   show('scan');
+  await stopScan();
   try{
-    // Explicitly request camera — triggers the browser Allow/Block dialog
-    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
-    stream.getTracks().forEach(t=>t.stop()); // release, ZXing will reopen
-    document.getElementById('scanHint').textContent='Hold steady — EAN-13 / UPC';
-    codeReader=new ZXingBrowser.BrowserMultiFormatReader();
-    const devices=await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
-    const rear=devices.find(d=>/back|rear|environment/i.test(d.label))||devices[devices.length-1];
-    scanControls=await codeReader.decodeFromVideoDevice(rear?rear.deviceId:undefined,'video',(res)=>{ if(res) onScanned(res.getText()); });
+    html5Qr = new Html5Qrcode('qr-reader');
+    await html5Qr.start(
+      {facingMode:'environment'},
+      {fps:15, qrbox:{width:260,height:120}, aspectRatio:0.75},
+      (text)=>{ onScanned(text); },
+      ()=>{}
+    );
+    document.getElementById('scanHint').textContent='Hold steady — point at the barcode';
   }catch(e){
     const hint=document.getElementById('scanHint');
     const retry=document.getElementById('retryBtn');
-    if(e.name==='NotAllowedError'||e.name==='PermissionDeniedError'){
-      hint.innerHTML='<b>Camera permission denied.</b><br><br>In your browser, tap the <b>🔒 lock</b> in the address bar → <b>Camera → Allow</b> → tap Retry below.';
+    const msg=String(e.message||e);
+    if(msg.toLowerCase().includes('permission')||msg.toLowerCase().includes('denied')||msg.toLowerCase().includes('notallowed')){
+      hint.innerHTML='<b>Camera permission denied.</b><br>Go to iPhone Settings → Chrome → Camera → Allow, then tap Retry.';
     } else {
-      hint.textContent='Camera error: '+e.message;
+      hint.textContent='Camera error: '+msg;
     }
     retry.classList.remove('hidden');
-    toast('Camera blocked',false);
+    toast('Camera error',false);
   }
 }
-function stopScan(){ try{scanControls&&scanControls.stop();}catch(e){} scanControls=null; codeReader=null; }
-function onScanned(t){ const ean=(t||'').replace(/\D/g,'').trim(); if(!ean)return; stopScan(); if(navigator.vibrate)navigator.vibrate(60); lookupAndShow(ean); }
+async function stopScan(){
+  if(html5Qr){
+    try{ if(html5Qr.isScanning) await html5Qr.stop(); html5Qr.clear(); }catch(e){}
+    html5Qr=null;
+  }
+}
+function onScanned(text){
+  const ean=(text||'').replace(/\D/g,'').trim();
+  if(!ean) return;
+  stopScan();
+  if(navigator.vibrate) navigator.vibrate(60);
+  lookupAndShow(ean);
+}
 function manualEntry(){ const ean=(prompt('Enter EAN / UPC:')||'').replace(/\D/g,'').trim(); if(ean) lookupAndShow(ean); }
 
 /* Lookup */
