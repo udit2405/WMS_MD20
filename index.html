@@ -96,6 +96,7 @@
       <div id="modeBadge" class="absolute top-3 left-3 px-3 py-1 rounded-full text-white text-xs font-bold"></div>
     </div>
     <p id="scanHint" class="text-center text-sm text-slate-500 mt-3">Hold steady — EAN-13 / UPC</p>
+    <button id="retryBtn" onclick="startScan()" class="tap w-full mt-3 rounded-xl bg-indigo-600 text-white font-semibold hidden">🔄 Retry camera</button>
     <button onclick="manualEntry()" class="tap w-full mt-3 rounded-xl bg-slate-100 dark:bg-slate-800 font-semibold">Can't scan? Enter EAN manually</button>
   </section>
 
@@ -397,13 +398,26 @@ async function startScan(){
   const m=MODE_META[CURRENT_MODE]||MODE_META.inward;
   const badge=document.getElementById('modeBadge');
   badge.textContent=m.label; badge.className=`absolute top-3 left-3 px-3 py-1 rounded-full text-white text-xs font-bold ${m.bg}`;
+  document.getElementById('retryBtn').classList.add('hidden');
+  document.getElementById('scanHint').textContent='Hold steady — EAN-13 / UPC';
   show('scan');
   try{
     codeReader=new ZXingBrowser.BrowserMultiFormatReader();
     const devices=await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
     const rear=devices.find(d=>/back|rear|environment/i.test(d.label))||devices[devices.length-1];
     scanControls=await codeReader.decodeFromVideoDevice(rear?rear.deviceId:undefined,'video',(res)=>{ if(res) onScanned(res.getText()); });
-  }catch(e){ document.getElementById('scanHint').textContent='Camera blocked — enter EAN manually.'; toast('Camera unavailable',false); }
+  }catch(e){
+    const denied = e.name==='NotAllowedError'||e.name==='PermissionDeniedError';
+    const hint = document.getElementById('scanHint');
+    const retry = document.getElementById('retryBtn');
+    if(denied){
+      hint.innerHTML='<b>Camera permission denied.</b><br>Tap the 🔒 icon in your browser address bar → allow Camera → tap Retry.';
+    } else {
+      hint.textContent='Camera unavailable on this device.';
+    }
+    retry.classList.remove('hidden');
+    toast('Camera blocked — allow permission and retry',false);
+  }
 }
 function stopScan(){ try{scanControls&&scanControls.stop();}catch(e){} scanControls=null; codeReader=null; }
 function onScanned(t){ const ean=(t||'').replace(/\D/g,'').trim(); if(!ean)return; stopScan(); if(navigator.vibrate)navigator.vibrate(60); lookupAndShow(ean); }
