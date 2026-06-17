@@ -399,24 +399,27 @@ async function startScan(){
   const badge=document.getElementById('modeBadge');
   badge.textContent=m.label; badge.className=`absolute top-3 left-3 px-3 py-1 rounded-full text-white text-xs font-bold ${m.bg}`;
   document.getElementById('retryBtn').classList.add('hidden');
-  document.getElementById('scanHint').textContent='Hold steady — EAN-13 / UPC';
+  document.getElementById('scanHint').textContent='Starting camera…';
   show('scan');
   try{
+    // Explicitly request camera — triggers the browser Allow/Block dialog
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    stream.getTracks().forEach(t=>t.stop()); // release, ZXing will reopen
+    document.getElementById('scanHint').textContent='Hold steady — EAN-13 / UPC';
     codeReader=new ZXingBrowser.BrowserMultiFormatReader();
     const devices=await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
     const rear=devices.find(d=>/back|rear|environment/i.test(d.label))||devices[devices.length-1];
     scanControls=await codeReader.decodeFromVideoDevice(rear?rear.deviceId:undefined,'video',(res)=>{ if(res) onScanned(res.getText()); });
   }catch(e){
-    const denied = e.name==='NotAllowedError'||e.name==='PermissionDeniedError';
-    const hint = document.getElementById('scanHint');
-    const retry = document.getElementById('retryBtn');
-    if(denied){
-      hint.innerHTML='<b>Camera permission denied.</b><br>Tap the 🔒 icon in your browser address bar → allow Camera → tap Retry.';
+    const hint=document.getElementById('scanHint');
+    const retry=document.getElementById('retryBtn');
+    if(e.name==='NotAllowedError'||e.name==='PermissionDeniedError'){
+      hint.innerHTML='<b>Camera permission denied.</b><br><br>In your browser, tap the <b>🔒 lock</b> in the address bar → <b>Camera → Allow</b> → tap Retry below.';
     } else {
-      hint.textContent='Camera unavailable on this device.';
+      hint.textContent='Camera error: '+e.message;
     }
     retry.classList.remove('hidden');
-    toast('Camera blocked — allow permission and retry',false);
+    toast('Camera blocked',false);
   }
 }
 function stopScan(){ try{scanControls&&scanControls.stop();}catch(e){} scanControls=null; codeReader=null; }
