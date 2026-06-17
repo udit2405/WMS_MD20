@@ -410,7 +410,19 @@ async function startScan(){
     html5Qr = new Html5Qrcode('qr-reader');
     await html5Qr.start(
       {facingMode:'environment'},
-      {fps:15, qrbox:{width:260,height:120}, aspectRatio:0.75},
+      {
+        fps: 30,
+        qrbox: {width:320, height:140},
+        aspectRatio: 0.75,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_128
+        ],
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+      },
       (text)=>{ onScanned(text); },
       ()=>{}
     );
