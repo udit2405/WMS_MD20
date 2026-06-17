@@ -5,14 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <meta name="theme-color" content="#0f172a" />
 <title>VIP WMS — Warehouse Scanner</title>
-
-<!-- Everything from CDN: no build step, drop this one file on GitHub Pages -->
 <script src="https://cdn.tailwindcss.com"></script>
 <script>tailwind.config = { darkMode: 'class' };</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-
 <style>
   html,body{-webkit-tap-highlight-color:transparent}
   .tap{min-height:56px}
@@ -26,20 +23,23 @@
 
 <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 min-h-screen antialiased">
 
-<!-- Tailwind safelist for dynamically-injected status colours -->
+<!-- Tailwind safelist -->
 <div class="hidden
   bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300
   bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300
   bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300
   bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300
   bg-slate-100 text-slate-700 dark:bg-slate-900/40 dark:text-slate-300
-  text-indigo-600 text-emerald-600 text-slate-600 text-amber-600"></div>
+  border-emerald-200 border-indigo-200 border-amber-200
+  text-emerald-600 text-indigo-600 text-amber-600 text-slate-600 text-rose-600
+  bg-emerald-600 hover:bg-emerald-700 bg-indigo-600 hover:bg-indigo-700 bg-amber-500 hover:bg-amber-600
+  shadow-emerald-600/20 shadow-indigo-600/20 shadow-amber-500/20"></div>
 
-<!-- ===== TOP BAR ===== -->
+<!-- TOP BAR -->
 <header class="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-800">
   <div class="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
     <div class="flex items-center gap-2">
-      <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white grid place-items-center font-bold">V</div>
+      <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white grid place-items-center font-bold text-sm">V</div>
       <div class="leading-tight">
         <div class="font-bold text-sm">VIP WMS</div>
         <div id="modeChip" class="text-[10px] text-slate-500 dark:text-slate-400">Local mode</div>
@@ -47,31 +47,41 @@
     </div>
     <div class="flex items-center gap-2">
       <span id="userChip" class="text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"></span>
-      <button id="themeBtn" class="w-9 h-9 grid place-items-center rounded-lg bg-slate-100 dark:bg-slate-800" aria-label="Theme"><span id="themeIcon">🌙</span></button>
+      <button id="themeBtn" class="w-9 h-9 grid place-items-center rounded-lg bg-slate-100 dark:bg-slate-800"><span id="themeIcon">🌙</span></button>
     </div>
   </div>
 </header>
 
 <main class="max-w-md mx-auto px-4 pb-28 pt-4">
 
-  <!-- ===== HOME ===== -->
+  <!-- HOME -->
   <section id="view-home" class="view">
-    <div class="text-center mt-6 mb-8">
-      <h1 class="text-2xl font-extrabold">Inventory Scanner</h1>
-      <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Scan a carton barcode to put it away</p>
+    <div class="text-center mt-4 mb-6">
+      <h1 class="text-2xl font-extrabold">Warehouse Operations</h1>
+      <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Select your role to begin</p>
     </div>
-    <button onclick="startScan()" class="tap w-full rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-bold flex items-center justify-center gap-3 shadow-lg shadow-indigo-600/20 py-5">
-      <span class="text-2xl">📷</span> Scan Product
-    </button>
-    <div class="grid grid-cols-2 gap-3 mt-3">
-      <button onclick="manualEntry()" class="tap rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-semibold flex items-center justify-center gap-2">⌨️ Enter EAN</button>
-      <button onclick="show('inventory');loadInventory();" class="tap rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-semibold flex items-center justify-center gap-2">📦 Inventory</button>
+    <div class="space-y-3">
+      <button onclick="setMode('inward');startScan()" class="tap w-full rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-left p-5 flex items-center gap-4 shadow-lg shadow-emerald-600/20">
+        <span class="text-3xl">📥</span>
+        <div><div class="font-bold text-lg">Inward</div><div class="text-emerald-100 text-sm">Receive &amp; log incoming stock</div></div>
+      </button>
+      <button onclick="setMode('putaway');show('putaway')" class="tap w-full rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-left p-5 flex items-center gap-4 shadow-lg shadow-indigo-600/20">
+        <span class="text-3xl">🔄</span>
+        <div><div class="font-bold text-lg">Putaway</div><div class="text-indigo-100 text-sm">Place received stock into locations</div></div>
+      </button>
+      <button onclick="setMode('outward');startScan()" class="tap w-full rounded-2xl bg-amber-500 hover:bg-amber-600 text-white text-left p-5 flex items-center gap-4 shadow-lg shadow-amber-500/20">
+        <span class="text-3xl">📤</span>
+        <div><div class="font-bold text-lg">Outward</div><div class="text-amber-100 text-sm">Dispatch stock out of warehouse</div></div>
+      </button>
     </div>
     <div id="homeStats" class="grid grid-cols-3 gap-3 mt-6"></div>
-    <button onclick="show('settings')" class="tap w-full mt-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-semibold flex items-center justify-center gap-2">⚙️ Data &amp; Settings</button>
+    <div class="grid grid-cols-2 gap-2 mt-3">
+      <button onclick="show('inventory');loadInventory();" class="tap rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-semibold flex items-center justify-center gap-2 text-sm">📦 Full Inventory</button>
+      <button onclick="show('settings')" class="tap rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-semibold flex items-center justify-center gap-2 text-sm">⚙️ Settings</button>
+    </div>
   </section>
 
-  <!-- ===== SCANNER ===== -->
+  <!-- SCANNER (shared) -->
   <section id="view-scan" class="view hidden">
     <div class="flex items-center justify-between mb-3">
       <h2 class="font-bold text-lg">Point at the barcode</h2>
@@ -83,51 +93,113 @@
         <div class="absolute inset-x-8 top-[12%] bottom-[12%] border-2 border-white/70 rounded-xl"></div>
         <div class="scanline absolute inset-x-10 h-0.5 bg-red-500/80"></div>
       </div>
+      <div id="modeBadge" class="absolute top-3 left-3 px-3 py-1 rounded-full text-white text-xs font-bold"></div>
     </div>
     <p id="scanHint" class="text-center text-sm text-slate-500 mt-3">Hold steady — EAN-13 / UPC</p>
     <button onclick="manualEntry()" class="tap w-full mt-3 rounded-xl bg-slate-100 dark:bg-slate-800 font-semibold">Can't scan? Enter EAN manually</button>
   </section>
 
-  <!-- ===== PRODUCT + LOCATION ===== -->
-  <section id="view-product" class="view hidden fade-in">
+  <!-- INWARD FORM -->
+  <section id="view-inward-form" class="view hidden fade-in">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="font-bold text-lg">Product found</h2>
+      <div class="flex items-center gap-2">
+        <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 text-xs font-bold">📥 INWARD</span>
+        <h2 class="font-bold text-lg">Product received</h2>
+      </div>
       <button onclick="show('home')" class="text-sm text-slate-500">✕</button>
     </div>
-    <div id="productCard" class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4"></div>
-    <h3 class="font-semibold mt-6 mb-2">Where are you putting it?</h3>
+    <div id="inwardProductCard" class="rounded-2xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/50 p-4"></div>
+    <h3 class="font-semibold mt-5 mb-2">Receiving details</h3>
+    <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+      <div>
+        <label class="text-xs font-medium text-slate-500">Quantity received</label>
+        <input id="iw_qty" type="number" min="1" value="1" class="tap w-full mt-1 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-lg" />
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-500">Condition</label>
+        <select id="iw_condition" class="tap w-full mt-1 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-lg">
+          <option value="INWARD">Good / OK</option>
+          <option value="DAMAGED">Damaged</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-500">GRN / PO ref (optional)</label>
+        <input id="iw_remark" placeholder="e.g. GRN-2026-001" class="tap w-full mt-1 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+      </div>
+    </div>
+    <button onclick="saveInward()" id="saveInwardBtn" class="tap w-full mt-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold shadow-lg shadow-emerald-600/20">✓ Confirm Receipt</button>
+    <button onclick="startScan()" class="tap w-full mt-2 rounded-xl bg-slate-100 dark:bg-slate-800 font-semibold">Scan next item</button>
+  </section>
+
+  <!-- PUTAWAY LIST -->
+  <section id="view-putaway" class="view hidden">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <span class="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-xs font-bold">🔄 PUTAWAY</span>
+        <h2 class="font-bold text-lg">Pending putaway</h2>
+      </div>
+      <button onclick="show('home')" class="text-sm text-slate-500">✕</button>
+    </div>
+    <p class="text-xs text-slate-400 mb-3">Items received but not yet assigned a location.</p>
+    <div id="putawayCount" class="text-xs text-slate-400 mb-2"></div>
+    <div id="putawayList" class="space-y-2"></div>
+  </section>
+
+  <!-- PUTAWAY LOCATION FORM -->
+  <section id="view-putaway-form" class="view hidden fade-in">
+    <div class="flex items-center justify-between mb-3">
+      <button onclick="show('putaway');loadPutawayList()" class="text-sm text-slate-500">← Back</button>
+      <span class="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-xs font-bold">🔄 PUTAWAY</span>
+    </div>
+    <div id="putawayProductCard" class="rounded-2xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900/50 p-4 mb-4"></div>
+    <h3 class="font-semibold mb-2">Assign location</h3>
     <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 space-y-3">
       <div>
         <label class="text-xs font-medium text-slate-500">Location code</label>
-        <input id="f_location" autocomplete="off" placeholder="e.g. R2-L1-A-A1" class="tap w-full mt-1 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-lg font-mono uppercase" />
-        <p class="text-[11px] text-slate-400 mt-1">Format used on the floor: Rack-Level-Bay-Bin</p>
+        <input id="pa_location" autocomplete="off" placeholder="e.g. R2-L1-A-A1" class="tap w-full mt-1 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-lg font-mono uppercase" />
+        <p class="text-[11px] text-slate-400 mt-1">Rack-Level-Bay-Bin</p>
       </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="text-xs font-medium text-slate-500">Quantity</label>
-          <input id="f_qty" type="number" min="1" value="1" class="tap w-full mt-1 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-lg" />
-        </div>
-        <div>
-          <label class="text-xs font-medium text-slate-500">Status</label>
-          <select id="f_status" class="tap w-full mt-1 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-lg">
-            <option value="IN_STOCK">In stock</option><option value="PUTAWAY">Putaway</option>
-            <option value="OUTBOUND">Outbound</option><option value="DAMAGED">Damaged</option><option value="HOLD">Hold</option>
-          </select>
-        </div>
+      <div>
+        <label class="text-xs font-medium text-slate-500">Quantity</label>
+        <input id="pa_qty" type="number" min="1" value="1" class="tap w-full mt-1 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-lg" />
       </div>
       <div>
         <label class="text-xs font-medium text-slate-500">Remark (optional)</label>
-        <input id="f_remark" class="tap w-full mt-1 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+        <input id="pa_remark" class="tap w-full mt-1 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
       </div>
     </div>
-    <button onclick="saveInventory()" id="saveBtn" class="tap w-full mt-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold shadow-lg shadow-emerald-600/20">✓ Save Inventory</button>
-    <button onclick="startScan()" class="tap w-full mt-2 rounded-xl bg-slate-100 dark:bg-slate-800 font-semibold">Scan next</button>
+    <button onclick="savePutaway()" id="savePutawayBtn" class="tap w-full mt-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-bold shadow-lg shadow-indigo-600/20">✓ Confirm Putaway</button>
   </section>
 
-  <!-- ===== INVENTORY + SEARCH ===== -->
+  <!-- OUTWARD FORM -->
+  <section id="view-outward-form" class="view hidden fade-in">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 text-xs font-bold">📤 OUTWARD</span>
+        <h2 class="font-bold text-lg">Dispatch product</h2>
+      </div>
+      <button onclick="show('home')" class="text-sm text-slate-500">✕</button>
+    </div>
+    <div id="outwardProductCard" class="rounded-2xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/50 p-4"></div>
+    <h3 class="font-semibold mt-5 mb-2">Dispatch details</h3>
+    <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+      <div>
+        <label class="text-xs font-medium text-slate-500">Quantity dispatched</label>
+        <input id="ow_qty" type="number" min="1" value="1" class="tap w-full mt-1 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-lg" />
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-500">Order / DO ref (optional)</label>
+        <input id="ow_remark" placeholder="e.g. DO-2026-047" class="tap w-full mt-1 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+      </div>
+    </div>
+    <button onclick="saveOutward()" id="saveOutwardBtn" class="tap w-full mt-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white text-lg font-bold shadow-lg shadow-amber-500/20">✓ Confirm Dispatch</button>
+    <button onclick="startScan()" class="tap w-full mt-2 rounded-xl bg-slate-100 dark:bg-slate-800 font-semibold">Scan next item</button>
+  </section>
+
+  <!-- FULL INVENTORY -->
   <section id="view-inventory" class="view hidden">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="font-bold text-lg">Inventory</h2>
+      <h2 class="font-bold text-lg">Full Inventory</h2>
       <button onclick="show('home')" class="text-sm text-slate-500">✕</button>
     </div>
     <div class="relative">
@@ -141,7 +213,7 @@
     <div id="invList" class="mt-2 space-y-2"></div>
   </section>
 
-  <!-- ===== DETAILS ===== -->
+  <!-- DETAILS -->
   <section id="view-details" class="view hidden fade-in">
     <div class="flex items-center justify-between mb-3">
       <h2 class="font-bold text-lg">Product details</h2>
@@ -150,13 +222,12 @@
     <div id="detailsCard"></div>
   </section>
 
-  <!-- ===== SETTINGS / DATA ===== -->
+  <!-- SETTINGS -->
   <section id="view-settings" class="view hidden">
     <div class="flex items-center justify-between mb-3">
       <h2 class="font-bold text-lg">Data &amp; Settings</h2>
       <button onclick="show('home')" class="text-sm text-slate-500">✕</button>
     </div>
-
     <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4">
       <div class="font-semibold text-sm">Material Master</div>
       <p class="text-xs text-slate-500 mt-1"><span id="masterCount">0</span> products loaded. Import <b>MATERIAL MASTER.csv</b> to load your full catalogue.</p>
@@ -164,47 +235,41 @@
       <button onclick="importMasterCsv()" class="tap w-full mt-2 rounded-xl bg-indigo-600 text-white font-semibold">Import Material Master CSV</button>
       <pre id="mmLog" class="mt-2 text-[11px] text-slate-500 whitespace-pre-wrap"></pre>
     </div>
-
     <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 mt-3">
       <div class="font-semibold text-sm">Operator name</div>
       <input id="opInput" class="tap w-full mt-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
       <button onclick="saveOperator()" class="tap w-full mt-2 rounded-xl bg-slate-100 dark:bg-slate-800 font-semibold">Save name</button>
     </div>
-
     <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 mt-3">
       <div class="font-semibold text-sm">Cloud sync (optional)</div>
-      <p class="text-xs text-slate-500 mt-1">Leave blank to keep everything on this phone. Add Supabase keys to share data across devices. <span id="cloudState" class="font-semibold"></span></p>
+      <p class="text-xs text-slate-500 mt-1">Leave blank to keep data on this phone. <span id="cloudState" class="font-semibold"></span></p>
       <input id="supaUrl" placeholder="Supabase Project URL" class="tap w-full mt-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" />
       <input id="supaKey" placeholder="Supabase anon key" class="tap w-full mt-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" />
       <button onclick="saveCloud()" class="tap w-full mt-2 rounded-xl bg-emerald-600 text-white font-semibold">Save &amp; use cloud</button>
       <button onclick="clearCloud()" class="tap w-full mt-2 rounded-xl bg-slate-100 dark:bg-slate-800 font-semibold">Use local only</button>
     </div>
-
     <div class="rounded-2xl bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/50 p-4 mt-3">
       <button onclick="resetLocal()" class="text-rose-600 text-sm font-semibold">Reset local data</button>
     </div>
   </section>
+
 </main>
 
-<!-- ===== BOTTOM NAV ===== -->
+<!-- BOTTOM NAV -->
 <nav class="fixed bottom-0 inset-x-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-t border-slate-200 dark:border-slate-800">
-  <div class="max-w-md mx-auto grid grid-cols-3">
-    <button onclick="show('home')" class="py-3 flex flex-col items-center text-xs gap-0.5"><span>🏠</span>Home</button>
-    <button onclick="startScan()" class="py-3 flex flex-col items-center text-xs gap-0.5"><span>📷</span>Scan</button>
-    <button onclick="show('inventory');loadInventory();" class="py-3 flex flex-col items-center text-xs gap-0.5"><span>📦</span>Inventory</button>
+  <div class="max-w-md mx-auto grid grid-cols-4">
+    <button onclick="show('home')" class="py-3 flex flex-col items-center text-xs gap-0.5 text-slate-500"><span>🏠</span>Home</button>
+    <button onclick="setMode('inward');startScan()" class="py-3 flex flex-col items-center text-xs gap-0.5 text-emerald-600 font-semibold"><span>📥</span>Inward</button>
+    <button onclick="setMode('putaway');show('putaway')" class="py-3 flex flex-col items-center text-xs gap-0.5 text-indigo-600 font-semibold"><span>🔄</span>Putaway</button>
+    <button onclick="setMode('outward');startScan()" class="py-3 flex flex-col items-center text-xs gap-0.5 text-amber-600 font-semibold"><span>📤</span>Outward</button>
   </div>
 </nav>
 
 <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-24 z-50 hidden px-4 py-2 rounded-full text-white text-sm font-medium shadow-lg"></div>
 
 <script>
-/* =====================================================================
-   VIP WMS — single-file app.
-   Works with ZERO setup using the phone's local storage.
-   Optional: add Supabase keys in Settings to sync across devices.
-   ===================================================================== */
+/* VIP WMS — Inward / Putaway / Outward */
 
-/* ---------- Seed Material Master (real VIP products, so it works on first open) ---------- */
 const SEED_MASTER = [
  ["8909074010224","SGRAINMDBLK","RAIN SLING MEDIUM BLACK","FS","FASHION","CAPRESE","SS 26","PREMIUM","Sling","42022210",6],
  ["8909074010200","SGRAINMDCLR","RAIN SLING MEDIUM CHERRY LACQUER","FS","FASHION","CAPRESE","SS 26","PREMIUM","Sling","42022210",6],
@@ -221,12 +286,14 @@ const SEED_MASTER = [
  ["8901188956368","PORTOB75BLK","PORTO 8W STROLLY LARGE 360 BLACK","HL","HARD LUGGAGE","VIP","Upright","Regular","360","42021220",36]
 ].map(a=>({ean:a[0],material_number:a[1],material_description:a[2],division_code:a[3],division_description:a[4],brand:a[5],product_category:a[6],product_category_segment:a[7],product_type:a[8],hsn_code:a[9],warranty_months:a[10]}));
 
-/* ---------- State ---------- */
+/* State */
 let OPERATOR = localStorage.getItem('wms_operator') || '';
 let sb = null, CLOUD = false;
-let currentProduct = null, codeReader = null, scanControls = null, searchTimer = null;
+let currentProduct = null, currentPutawayRecord = null;
+let codeReader = null, scanControls = null, searchTimer = null;
+let CURRENT_MODE = 'inward';
 
-/* ---------- Storage layer: cloud (Supabase) OR local (localStorage) ---------- */
+/* Storage */
 function lsGet(k,d){ try{return JSON.parse(localStorage.getItem(k))??d;}catch(e){return d;} }
 function lsSet(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
 function localMaster(){ const m=lsGet('wms_master',null); if(m) return m; const o={}; SEED_MASTER.forEach(p=>o[p.ean]=p); lsSet('wms_master',o); return o; }
@@ -257,15 +324,21 @@ const DB = {
     if(CLOUD){ const {error}=await sb.from('warehouse_inventory').insert(row); if(error) throw error; return; }
     const inv=localInv(); inv.unshift({id:crypto.randomUUID(),created_at:new Date().toISOString(),...row}); lsSet('wms_inventory',inv);
   },
-  async listInventory(q){
+  async updateInventory(id, patch){
+    if(CLOUD){ const {error}=await sb.from('warehouse_inventory').update(patch).eq('id',id); if(error) throw error; return; }
+    const inv=localInv(); const idx=inv.findIndex(r=>r.id===id); if(idx>=0) Object.assign(inv[idx],patch); lsSet('wms_inventory',inv);
+  },
+  async listInventory(q, statusFilter){
     if(CLOUD){
-      let query=sb.from('warehouse_inventory').select('*').order('created_at',{ascending:false}).limit(200);
+      let query=sb.from('warehouse_inventory').select('*').order('created_at',{ascending:false}).limit(300);
+      if(statusFilter && statusFilter.length) query=query.in('status',statusFilter);
       if(q){ const l=`%${q}%`; query=query.or(`ean.ilike.${l},material_number.ilike.${l},material_description.ilike.${l},brand.ilike.${l},location_code.ilike.${l}`); }
       const {data}=await query; return data||[];
     }
     let inv=localInv();
+    if(statusFilter && statusFilter.length) inv=inv.filter(r=>statusFilter.includes(r.status));
     if(q){ const s=q.toLowerCase(); inv=inv.filter(r=>[r.ean,r.material_number,r.material_description,r.brand,r.location_code].some(v=>(v||'').toLowerCase().includes(s))); }
-    return inv.slice(0,200);
+    return inv.slice(0,300);
   },
   async invByEan(ean){
     if(CLOUD){ const {data}=await sb.from('warehouse_inventory').select('*').eq('ean',ean).order('created_at',{ascending:false}).limit(50); return data||[]; }
@@ -273,19 +346,23 @@ const DB = {
   },
   async stats(){
     if(CLOUD){
-      const today=new Date().toISOString().slice(0,10);
-      const [{count:scans},{count:skus},t]=await Promise.all([
-        sb.from('warehouse_inventory').select('*',{count:'exact',head:true}),
-        sb.from('material_master').select('*',{count:'exact',head:true}),
-        sb.from('warehouse_inventory').select('quantity').eq('scan_date',today)]);
-      return {scans:scans||0,skus:skus||0,today:(t.data||[]).reduce((s,r)=>s+(r.quantity||0),0)};
+      const [r1,r2,r3]=await Promise.all([
+        sb.from('warehouse_inventory').select('*',{count:'exact',head:true}).in('status',['INWARD','DAMAGED']),
+        sb.from('warehouse_inventory').select('*',{count:'exact',head:true}).eq('status','PUTAWAY'),
+        sb.from('warehouse_inventory').select('*',{count:'exact',head:true}).eq('status','OUTBOUND')
+      ]);
+      return {inward:r1.count||0, putaway:r2.count||0, outward:r3.count||0};
     }
-    const inv=localInv(), today=new Date().toISOString().slice(0,10);
-    return {scans:inv.length,skus:Object.keys(localMaster()).length,today:inv.filter(r=>r.scan_date===today).reduce((s,r)=>s+(r.quantity||0),0)};
+    const inv=localInv();
+    return {
+      inward: inv.filter(r=>['INWARD','DAMAGED'].includes(r.status)).length,
+      putaway: inv.filter(r=>r.status==='PUTAWAY').length,
+      outward: inv.filter(r=>r.status==='OUTBOUND').length
+    };
   }
 };
 
-/* ---------- Boot ---------- */
+/* Boot */
 initCloud();
 if(!OPERATOR){ OPERATOR=(prompt('Your name (recorded with each scan):')||'OPERATOR').trim().toUpperCase(); localStorage.setItem('wms_operator',OPERATOR); }
 document.getElementById('userChip').textContent=OPERATOR;
@@ -293,98 +370,198 @@ document.getElementById('userChip').textContent=OPERATOR;
 document.getElementById('themeBtn').onclick=()=>{document.documentElement.classList.toggle('dark');localStorage.setItem('wms_theme',document.documentElement.classList.contains('dark')?'dark':'light');syncIcon();};
 function syncIcon(){document.getElementById('themeIcon').textContent=document.documentElement.classList.contains('dark')?'☀️':'🌙';}
 
-/* ---------- Routing / toast ---------- */
+/* Mode */
+function setMode(mode){ CURRENT_MODE=mode; }
+
+/* Routing */
 function show(name){
   document.querySelectorAll('.view').forEach(v=>v.classList.add('hidden'));
   document.getElementById('view-'+name).classList.remove('hidden');
   if(name!=='scan') stopScan();
   if(name==='settings') refreshSettings();
+  if(name==='home') loadStats();
+  if(name==='putaway') loadPutawayList();
   scrollTo(0,0);
 }
 function toast(m,ok=true){ const t=document.getElementById('toast'); t.textContent=m;
   t.className='fixed left-1/2 -translate-x-1/2 bottom-24 z-50 px-4 py-2 rounded-full text-white text-sm font-medium shadow-lg '+(ok?'bg-emerald-600':'bg-rose-600');
   t.classList.remove('hidden'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.add('hidden'),2600); }
 
-/* ---------- Scanning ---------- */
+/* Scanning */
+const MODE_META = {
+  inward:  {label:'📥 INWARD',  bg:'bg-emerald-600'},
+  putaway: {label:'🔄 PUTAWAY', bg:'bg-indigo-600'},
+  outward: {label:'📤 OUTWARD', bg:'bg-amber-500'}
+};
 async function startScan(){
+  const m=MODE_META[CURRENT_MODE]||MODE_META.inward;
+  const badge=document.getElementById('modeBadge');
+  badge.textContent=m.label; badge.className=`absolute top-3 left-3 px-3 py-1 rounded-full text-white text-xs font-bold ${m.bg}`;
   show('scan');
   try{
     codeReader=new ZXingBrowser.BrowserMultiFormatReader();
     const devices=await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
     const rear=devices.find(d=>/back|rear|environment/i.test(d.label))||devices[devices.length-1];
     scanControls=await codeReader.decodeFromVideoDevice(rear?rear.deviceId:undefined,'video',(res)=>{ if(res) onScanned(res.getText()); });
-  }catch(e){ document.getElementById('scanHint').textContent='Camera blocked. Allow access, or enter EAN manually.'; toast('Camera unavailable',false); }
+  }catch(e){ document.getElementById('scanHint').textContent='Camera blocked — enter EAN manually.'; toast('Camera unavailable',false); }
 }
 function stopScan(){ try{scanControls&&scanControls.stop();}catch(e){} scanControls=null; codeReader=null; }
 function onScanned(t){ const ean=(t||'').replace(/\D/g,'').trim(); if(!ean)return; stopScan(); if(navigator.vibrate)navigator.vibrate(60); lookupAndShow(ean); }
 function manualEntry(){ const ean=(prompt('Enter EAN / UPC:')||'').replace(/\D/g,'').trim(); if(ean) lookupAndShow(ean); }
 
-/* ---------- Lookup ---------- */
+/* Lookup */
 async function lookupAndShow(ean){
   toast('Looking up '+ean+'…');
   const data=await DB.getMaster(ean);
   if(!data){
-    if(confirm('EAN '+ean+' not found in Material Master.\nSave anyway as an unknown item?')){
+    if(confirm('EAN '+ean+' not in Material Master.\nSave as unknown item?')){
       currentProduct={ean,material_number:'',material_description:'(Unknown item)',brand:'',product_category:'',_unknown:true};
-      renderProduct(currentProduct,true); show('product');
+      routeToForm();
     }
     return;
   }
-  currentProduct=data; renderProduct(data,false); show('product');
+  currentProduct=data; routeToForm();
 }
-function row(l,v){ if(v==null||v==='')return ''; return `<div class="flex justify-between gap-3 py-1.5 border-b border-slate-100 dark:border-slate-800 last:border-0"><span class="text-slate-500 text-sm">${l}</span><span class="font-medium text-sm text-right">${v}</span></div>`; }
-function renderProduct(p,unknown){
-  document.getElementById('productCard').innerHTML=`
+function routeToForm(){
+  if(CURRENT_MODE==='inward'){ renderCard('inwardProductCard',currentProduct); show('inward-form'); }
+  else if(CURRENT_MODE==='outward'){ renderCard('outwardProductCard',currentProduct); show('outward-form'); }
+}
+
+function prow(l,v){ if(v==null||v==='')return ''; return `<div class="flex justify-between gap-3 py-1.5 border-b border-slate-100 dark:border-slate-800 last:border-0"><span class="text-slate-500 text-sm">${l}</span><span class="font-medium text-sm text-right">${v}</span></div>`; }
+function renderCard(elId, p){
+  document.getElementById(elId).innerHTML=`
     <div class="flex items-start justify-between">
       <div><div class="font-bold leading-snug">${p.material_description||'(no description)'}</div><div class="text-xs text-slate-500 mt-0.5">${p.material_number||''}</div></div>
       ${p.brand?`<span class="shrink-0 text-[11px] px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 font-semibold">${p.brand}</span>`:''}
     </div>
     <div class="mt-3">
-      ${row('EAN',`<span class="font-mono">${p.ean}</span>`)}
-      ${row('Category',p.product_category)}${row('Segment',p.product_category_segment)}
-      ${row('Type',p.product_type)}${row('Division',p.division_description)}
-      ${row('HSN',p.hsn_code)}${row('Warranty',p.warranty_months?p.warranty_months+' months':'')}
+      ${prow('EAN',`<span class="font-mono">${p.ean}</span>`)}
+      ${prow('Category',p.product_category)}${prow('Segment',p.product_category_segment)}
+      ${prow('Type',p.product_type)}${prow('Division',p.division_description)}
     </div>
-    ${unknown?'<div class="mt-2 text-xs text-amber-600">Not in Material Master — saving as unknown.</div>':''}`;
+    ${p._unknown?'<div class="mt-2 text-xs text-amber-600">Not in Material Master — saving as unknown.</div>':''}`;
 }
 
-/* ---------- Save ---------- */
-async function saveInventory(){
-  if(!currentProduct)return;
-  const loc=document.getElementById('f_location').value.trim().toUpperCase();
-  if(!loc)return toast('Enter a location',false);
-  const qty=Math.max(1,parseInt(document.getElementById('f_qty').value||'1',10));
-  const parts=loc.split(/[-_/ ]+/);
+/* Save — Inward */
+async function saveInward(){
+  if(!currentProduct) return;
+  const qty=Math.max(1,parseInt(document.getElementById('iw_qty').value||'1',10));
+  const status=document.getElementById('iw_condition').value;
+  const remark=document.getElementById('iw_remark').value.trim()||null;
   const now=new Date();
   const payload={
-    scan_date:now.toISOString().slice(0,10), scan_time:now.toTimeString().slice(0,8),
+    movement_type:'INWARD', scan_date:now.toISOString().slice(0,10), scan_time:now.toTimeString().slice(0,8),
     operator_name:OPERATOR, ean:currentProduct.ean,
     material_number:currentProduct.material_number||null, material_description:currentProduct.material_description||null,
     brand:currentProduct.brand||null, product_category:currentProduct.product_category||null,
-    location_code:loc, rack:parts[0]||null, level:parts[1]||null, bay:parts[2]||null, bin:parts[3]||null,
-    quantity:qty, status:document.getElementById('f_status').value, remark:document.getElementById('f_remark').value.trim()||null
+    location_code:null, rack:null, level:null, bay:null, bin:null,
+    quantity:qty, status, remark
   };
-  const btn=document.getElementById('saveBtn'); btn.disabled=true; btn.textContent='Saving…';
+  const btn=document.getElementById('saveInwardBtn'); btn.disabled=true; btn.textContent='Saving…';
   try{
-    if(currentProduct._unknown){ await DB.upsertMaster([{ean:currentProduct.ean,material_number:'UNKNOWN',material_description:'(Unknown item)'}]); }
+    if(currentProduct._unknown) await DB.upsertMaster([{ean:currentProduct.ean,material_number:'UNKNOWN',material_description:'(Unknown item)'}]);
     await DB.addInventory(payload);
-    if(navigator.vibrate)navigator.vibrate([40,40,40]);
-    toast('Saved '+qty+' @ '+loc);
-    document.getElementById('f_remark').value=''; document.getElementById('f_qty').value='1';
+    if(navigator.vibrate) navigator.vibrate([40,40,40]);
+    toast('✅ Received '+qty+' unit'+(qty>1?'s':''));
+    document.getElementById('iw_qty').value='1'; document.getElementById('iw_remark').value='';
     loadStats(); setTimeout(startScan,700);
   }catch(e){ toast('Save failed: '+(e.message||e),false); }
-  finally{ btn.disabled=false; btn.textContent='✓ Save Inventory'; }
+  finally{ btn.disabled=false; btn.textContent='✓ Confirm Receipt'; }
 }
 
-/* ---------- Inventory list + search ---------- */
+/* Save — Outward */
+async function saveOutward(){
+  if(!currentProduct) return;
+  const qty=Math.max(1,parseInt(document.getElementById('ow_qty').value||'1',10));
+  const remark=document.getElementById('ow_remark').value.trim()||null;
+  const now=new Date();
+  const payload={
+    movement_type:'OUTWARD', scan_date:now.toISOString().slice(0,10), scan_time:now.toTimeString().slice(0,8),
+    operator_name:OPERATOR, ean:currentProduct.ean,
+    material_number:currentProduct.material_number||null, material_description:currentProduct.material_description||null,
+    brand:currentProduct.brand||null, product_category:currentProduct.product_category||null,
+    location_code:null, rack:null, level:null, bay:null, bin:null,
+    quantity:qty, status:'OUTBOUND', remark
+  };
+  const btn=document.getElementById('saveOutwardBtn'); btn.disabled=true; btn.textContent='Saving…';
+  try{
+    await DB.addInventory(payload);
+    if(navigator.vibrate) navigator.vibrate([40,40,40]);
+    toast('✅ Dispatched '+qty+' unit'+(qty>1?'s':''));
+    document.getElementById('ow_qty').value='1'; document.getElementById('ow_remark').value='';
+    loadStats(); setTimeout(startScan,700);
+  }catch(e){ toast('Save failed: '+(e.message||e),false); }
+  finally{ btn.disabled=false; btn.textContent='✓ Confirm Dispatch'; }
+}
+
+/* Putaway list */
+async function loadPutawayList(){
+  const data=await DB.listInventory('',['INWARD']);
+  document.getElementById('putawayCount').textContent=`${data.length} item(s) awaiting putaway`;
+  const el=document.getElementById('putawayList');
+  if(!data.length){ el.innerHTML=`<div class="text-slate-400 text-sm text-center py-10">All items have been put away ✅</div>`; return; }
+  el.innerHTML=data.map(r=>`
+    <button onclick='openPutawayForm(${JSON.stringify(r)})' class="w-full text-left rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900/50 p-3 active:scale-[.99] transition">
+      <div class="flex justify-between gap-2">
+        <div class="min-w-0">
+          <div class="font-semibold text-sm truncate">${r.material_description||r.ean}</div>
+          <div class="text-xs text-slate-500">${r.material_number||''} ${r.brand?'· '+r.brand:''}</div>
+        </div>
+        <span class="shrink-0 text-[10px] px-2 py-0.5 h-fit rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">INWARD</span>
+      </div>
+      <div class="flex items-center justify-between mt-2 text-xs">
+        <span class="text-slate-500">Qty <b>${r.quantity}</b> · ${fmtDate(r.scan_date)} · ${r.operator_name||''}</span>
+        <span class="text-indigo-600 font-semibold">Assign location →</span>
+      </div>
+    </button>`).join('');
+}
+
+function openPutawayForm(record){
+  currentPutawayRecord=record;
+  document.getElementById('putawayProductCard').innerHTML=`
+    <div class="flex items-start justify-between">
+      <div><div class="font-bold">${record.material_description||record.ean}</div><div class="text-xs text-slate-500">${record.material_number||''}</div></div>
+      ${record.brand?`<span class="text-[11px] px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 font-semibold">${record.brand}</span>`:''}
+    </div>
+    <div class="mt-2 text-xs text-slate-500">Qty received: <b>${record.quantity}</b> · ${fmtDate(record.scan_date)}</div>`;
+  document.getElementById('pa_qty').value=record.quantity||1;
+  document.getElementById('pa_location').value='';
+  document.getElementById('pa_remark').value='';
+  show('putaway-form');
+}
+
+async function savePutaway(){
+  if(!currentPutawayRecord) return;
+  const loc=document.getElementById('pa_location').value.trim().toUpperCase();
+  if(!loc) return toast('Enter a location code',false);
+  const qty=Math.max(1,parseInt(document.getElementById('pa_qty').value||'1',10));
+  const remark=document.getElementById('pa_remark').value.trim()||null;
+  const parts=loc.split(/[-_/ ]+/);
+  const now=new Date();
+  const patch={
+    movement_type:'PUTAWAY', status:'PUTAWAY', location_code:loc,
+    rack:parts[0]||null, level:parts[1]||null, bay:parts[2]||null, bin:parts[3]||null,
+    quantity:qty, remark, scan_time:now.toTimeString().slice(0,8), operator_name:OPERATOR
+  };
+  const btn=document.getElementById('savePutawayBtn'); btn.disabled=true; btn.textContent='Saving…';
+  try{
+    await DB.updateInventory(currentPutawayRecord.id, patch);
+    if(navigator.vibrate) navigator.vibrate([40,40,40]);
+    toast('✅ Putaway at '+loc);
+    show('putaway'); loadPutawayList();
+  }catch(e){ toast('Save failed: '+(e.message||e),false); }
+  finally{ btn.disabled=false; btn.textContent='✓ Confirm Putaway'; }
+}
+
+/* Full inventory list */
 function debouncedSearch(){ clearTimeout(searchTimer); searchTimer=setTimeout(loadInventory,250); }
 async function loadInventory(){
   const q=(document.getElementById('searchBox')?.value||'').trim();
   const data=await DB.listInventory(q);
-  document.getElementById('invCount').textContent=(data.length)+' record(s)'+(q?` for "${q}"`:'');
+  document.getElementById('invCount').textContent=data.length+' record(s)'+(q?` for "${q}"`:'');
   const list=document.getElementById('invList');
   if(!data.length){ list.innerHTML=`<div class="text-slate-400 text-sm text-center py-10">No records.</div>`; return; }
-  const sc={IN_STOCK:'emerald',PUTAWAY:'indigo',OUTBOUND:'amber',DAMAGED:'rose',HOLD:'slate'};
+  const sc={INWARD:'emerald',PUTAWAY:'indigo',OUTBOUND:'amber',DAMAGED:'rose',HOLD:'slate'};
   list.innerHTML=data.map(r=>{ const c=sc[r.status]||'slate'; return `
     <button onclick='openDetails(${JSON.stringify(r.ean)})' class="w-full text-left rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 active:scale-[.99] transition">
       <div class="flex justify-between gap-2">
@@ -392,50 +569,55 @@ async function loadInventory(){
         <span class="shrink-0 text-[10px] px-2 py-0.5 h-fit rounded-full bg-${c}-100 text-${c}-700 dark:bg-${c}-900/40 dark:text-${c}-300">${r.status}</span>
       </div>
       <div class="flex items-center justify-between mt-2 text-xs">
-        <span class="font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">📍 ${r.location_code}</span>
+        <span class="font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">${r.location_code?'📍 '+r.location_code:'📥 No location yet'}</span>
         <span class="text-slate-500">Qty <b>${r.quantity}</b> · ${fmtDate(r.scan_date)}</span>
-      </div></button>`;}).join('');
+      </div>
+    </button>`;}).join('');
 }
 function fmtDate(d){ if(!d)return ''; try{return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});}catch(e){return d;} }
 
-/* ---------- Details ---------- */
+/* Details */
 async function openDetails(ean){
   show('details');
   const card=document.getElementById('detailsCard');
   card.innerHTML=`<div class="text-slate-400 text-sm py-8 text-center">Loading…</div>`;
   const [m,moves]=await Promise.all([DB.getMaster(ean),DB.invByEan(ean)]);
   const total=moves.reduce((s,r)=>s+(['OUTBOUND','DAMAGED'].includes(r.status)?-r.quantity:r.quantity),0);
+  const sc={INWARD:'emerald',PUTAWAY:'indigo',OUTBOUND:'amber',DAMAGED:'rose'};
   card.innerHTML=`
     <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4">
       <div class="flex items-start justify-between">
         <div><div class="font-bold">${m?.material_description||moves[0]?.material_description||ean}</div><div class="text-xs text-slate-500">${m?.material_number||''}</div></div>
         ${m?.brand?`<span class="text-[11px] px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 font-semibold">${m.brand}</span>`:''}
       </div>
-      <div class="mt-2 inline-flex"><span class="px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-semibold text-sm">On hand: ${total}</span></div>
+      <div class="mt-2"><span class="px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-semibold text-sm">On hand: ${total}</span></div>
       <div class="mt-3">
-        ${row('EAN',`<span class="font-mono">${ean}</span>`)}
-        ${m?row('Category',m.product_category):''}${m?row('Segment',m.product_category_segment):''}
-        ${m?row('Type',m.product_type):''}${m?row('Division',`${m.division_description||''} ${m.division_code?'('+m.division_code+')':''}`):''}
-        ${m?row('HSN',m.hsn_code):''}${m?row('Warranty',m.warranty_months?m.warranty_months+' months':''):''}
-        ${!m?'<div class="text-xs text-amber-600 py-2">No Material Master record for this EAN.</div>':''}
+        ${prow('EAN',`<span class="font-mono">${ean}</span>`)}
+        ${m?prow('Category',m.product_category):''}${m?prow('Brand',m.brand):''}
+        ${m?prow('HSN',m.hsn_code):''}${m?prow('Warranty',m.warranty_months?m.warranty_months+' months':''):''}
       </div>
     </div>
     <h3 class="font-semibold mt-5 mb-2 text-sm">Movements (${moves.length})</h3>
-    <div class="space-y-2">${moves.map(r=>`
+    <div class="space-y-2">${moves.map(r=>{ const c=sc[r.status]||'slate'; return `
       <div class="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 flex justify-between text-sm">
-        <div><div class="font-mono text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 inline-block">📍 ${r.location_code}</div><div class="text-xs text-slate-500 mt-1">${fmtDate(r.scan_date)} · ${r.operator_name||''}</div></div>
-        <div class="text-right"><div class="font-bold">${['OUTBOUND','DAMAGED'].includes(r.status)?'-':'+'}${r.quantity}</div><div class="text-[10px] text-slate-400">${r.status}</div></div>
-      </div>`).join('')}</div>`;
+        <div>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-${c}-100 text-${c}-700 dark:bg-${c}-900/40 dark:text-${c}-300 font-bold">${r.status}</span>
+          <div class="font-mono text-xs mt-1">${r.location_code?'📍 '+r.location_code:'📥 Dock / no location'}</div>
+          <div class="text-xs text-slate-500 mt-0.5">${fmtDate(r.scan_date)} · ${r.operator_name||''}</div>
+        </div>
+        <div class="text-right font-bold text-base">${['OUTBOUND','DAMAGED'].includes(r.status)?'-':'+'}${r.quantity}</div>
+      </div>`;}).join('')}</div>`;
 }
 
-/* ---------- Stats ---------- */
+/* Stats */
 async function loadStats(){
   const s=await DB.stats();
   const stat=(n,l,c)=>`<div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 text-center"><div class="text-2xl font-extrabold text-${c}-600">${n}</div><div class="text-[11px] text-slate-500 mt-0.5">${l}</div></div>`;
-  document.getElementById('homeStats').innerHTML=stat(s.scans,'Total scans','indigo')+stat(s.today,'Units today','emerald')+stat(s.skus,'Master SKUs','slate');
+  document.getElementById('homeStats').innerHTML=
+    stat(s.inward,'Inward','emerald')+stat(s.putaway,'Putaway','indigo')+stat(s.outward,'Outward','amber');
 }
 
-/* ---------- Settings ---------- */
+/* Settings */
 async function refreshSettings(){
   document.getElementById('masterCount').textContent=await DB.masterCount();
   document.getElementById('opInput').value=OPERATOR;
@@ -445,20 +627,19 @@ async function refreshSettings(){
 }
 function saveOperator(){ OPERATOR=(document.getElementById('opInput').value||'OPERATOR').trim().toUpperCase(); localStorage.setItem('wms_operator',OPERATOR); document.getElementById('userChip').textContent=OPERATOR; toast('Saved'); }
 function saveCloud(){ const u=document.getElementById('supaUrl').value.trim(),k=document.getElementById('supaKey').value.trim();
-  if(!u||!k)return toast('Enter both URL and key',false);
+  if(!u||!k) return toast('Enter both URL and key',false);
   localStorage.setItem('wms_supa_url',u); localStorage.setItem('wms_supa_key',k); initCloud(); toast(CLOUD?'Cloud enabled':'Invalid keys',CLOUD); loadStats(); }
 function clearCloud(){ localStorage.removeItem('wms_supa_url'); localStorage.removeItem('wms_supa_key'); CLOUD=false; sb=null; document.getElementById('modeChip').textContent='Local mode'; toast('Using local only'); refreshSettings(); loadStats(); }
-function resetLocal(){ if(confirm('Delete all locally-stored products and scans on this phone?')){ localStorage.removeItem('wms_master'); localStorage.removeItem('wms_inventory'); toast('Local data cleared'); loadStats(); refreshSettings(); } }
+function resetLocal(){ if(confirm('Delete all locally-stored products and scans?')){ localStorage.removeItem('wms_master'); localStorage.removeItem('wms_inventory'); toast('Local data cleared'); loadStats(); refreshSettings(); } }
 
-/* ---------- CSV import (Material Master) ---------- */
+/* CSV import */
 function importMasterCsv(){
-  const f=document.getElementById('mmFile').files[0]; if(!f)return toast('Choose a CSV',false);
+  const f=document.getElementById('mmFile').files[0]; if(!f) return toast('Choose a CSV',false);
   document.getElementById('mmLog').textContent='Parsing…';
   Papa.parse(f,{header:true,skipEmptyLines:true,complete:async(res)=>{
     const rows=res.data.map(r=>({
       ean:(r['(EAN/UPC)']??r['EAN/UPC']??r['EAN']??'').toString().trim(),
-      material_number:(r['Material Number']||'').trim(),
-      material_description:(r['Material Description']||'').trim(),
+      material_number:(r['Material Number']||'').trim(), material_description:(r['Material Description']||'').trim(),
       division_code:(r['Division Code']||'').trim(), division_description:(r['Division Description']||'').trim(),
       brand:(r['Brand Description']||'').trim(), product_category:(r['Product Category Description']||'').trim(),
       product_category_segment:(r['Product Category Segment Description']||'').trim(),
@@ -472,15 +653,15 @@ function importMasterCsv(){
   }});
 }
 
-/* ---------- CSV export (inventory) ---------- */
+/* CSV export */
 async function exportCsv(){
   const rows=await DB.listInventory('');
-  if(!rows.length)return toast('Nothing to export',false);
-  const cols=['scan_date','scan_time','operator_name','ean','material_number','material_description','brand','product_category','location_code','quantity','status','remark'];
+  if(!rows.length) return toast('Nothing to export',false);
+  const cols=['movement_type','scan_date','scan_time','operator_name','ean','material_number','material_description','brand','product_category','location_code','quantity','status','remark'];
   const esc=v=>`"${String(v??'').replace(/"/g,'""')}"`;
   const csv=[cols.join(','),...rows.map(r=>cols.map(c=>esc(r[c])).join(','))].join('\n');
   const blob=new Blob([csv],{type:'text/csv'}); const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob); a.download='wms_inventory_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+  a.href=URL.createObjectURL(blob); a.download='wms_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
 }
 
 loadStats();
