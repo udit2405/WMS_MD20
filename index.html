@@ -276,7 +276,7 @@
 
 
 /* State */
-const MASTER_VERSION = '3'; // bump when master.json changes
+const MASTER_VERSION = '4'; // bump when master.json changes
 let OPERATOR = localStorage.getItem('wms_operator') || '';
 let sb = null, CLOUD = false;
 let currentProduct = null, currentPutawayRecord = null;
@@ -319,7 +319,15 @@ function initCloud(){
 const DB = {
   async getMaster(ean){
     if(CLOUD){ const {data}=await sb.from('material_master').select('*').eq('ean',ean).maybeSingle(); return data; }
-    return localMaster()[ean] || null;
+    const r=localMaster()[ean]; if(!r) return null;
+    // expand compact keys to full keys
+    return r.material_number ? r : {
+      ean:r.ean, material_number:r.mn, material_description:r.md,
+      division_code:r.dc, division_description:r.dc,
+      brand:r.br, product_category:r.pc,
+      product_category_segment:'', product_type:r.pt,
+      hsn_code:r.hsn, warranty_months:r.wm
+    };
   },
   async upsertMaster(rows){
     if(CLOUD){ for(let i=0;i<rows.length;i+=500){ await sb.from('material_master').upsert(rows.slice(i,i+500),{onConflict:'ean'}); } return; }
