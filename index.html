@@ -276,7 +276,7 @@
 
 
 /* State */
-const MASTER_VERSION = '4'; // bump when master.json changes
+const MASTER_VERSION = '5'; // bump when master.json changes
 let OPERATOR = localStorage.getItem('wms_operator') || '';
 let sb = null, CLOUD = false;
 let currentProduct = null, currentPutawayRecord = null;
@@ -286,27 +286,92 @@ let CURRENT_MODE = 'inward';
 /* Storage */
 function lsGet(k,d){ try{return JSON.parse(localStorage.getItem(k))??d;}catch(e){return d;} }
 function lsSet(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+function localInv(){ return lsGet('wms_inventory',[]); }
+
+/* IndexedDB for master catalogue (no size limit vs localStorage 5MB) */
+let _idb = null;
+const _masterMem = new Map(); // hot in-memory cache for scanned EANs this session
+
+function openIDB(){
+  if(_idb) return Promise.resolve(_idb);
+  return new Promise((res,rej)=>{
+    const req = indexedDB.open('wms_master_db', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('master',{keyPath:'ean'});
+    req.onsuccess = e => { _idb=e.target.result; res(_idb); };
+    req.onerror = e => rej(e.target.error);
+  });
+}
+async function idbGet(ean){
+  if(_masterMem.has(ean)) return _masterMem.get(ean);
+  const db=await openIDB();
+  const r=await new Promise((res,rej)=>{
+    const req=db.transaction('master','readonly').objectStore('master').get(ean);
+    req.onsuccess=()=>res(req.result||null); req.onerror=()=>rej(req.error);
+  });
+  if(r) _masterMem.set(ean,r);
+  return r;
+}
+async function idbPutAll(records){
+  const db=await openIDB();
+  await new Promise((res,rej)=>{
+    const tx=db.transaction('master','readwrite'), store=tx.objectStore('master');
+    records.forEach(r=>store.put(r));
+    tx.oncomplete=res; tx.onerror=()=>rej(tx.error);
+  });
+  _masterMem.clear();
+}
+async function idbCount(){
+  const db=await openIDB();
+  return new Promise((res,rej)=>{
+    const req=db.transaction('master','readonly').objectStore('master').count();
+    req.onsuccess=()=>res(req.result); req.onerror=()=>rej(req.error);
+  });
+}
+async function idbClear(){
+  const db=await openIDB();
+  await new Promise((res,rej)=>{
+    const tx=db.transaction('master','readwrite');
+    tx.objectStore('master').clear();
+    tx.oncomplete=res; tx.onerror=()=>rej(tx.error);
+  });
+  _masterMem.clear();
+}
+
+function expandRecord(r){
+  if(!r) return null;
+  // compact keys → full keys (master.json uses short keys to save space)
+  return r.material_number ? r : {
+    ean:r.ean, material_number:r.mn, material_description:r.md,
+    division_code:r.dc, division_description:r.dc,
+    brand:r.br, product_category:r.pc,
+    product_category_segment:'', product_type:r.pt,
+    hsn_code:r.hsn, warranty_months:r.wm
+  };
+}
+
 async function ensureMaster(){
   if(localStorage.getItem('wms_master_version')===MASTER_VERSION) return;
+  const el=document.getElementById('masterStatus');
   try{
-    document.getElementById('masterStatus').textContent='Downloading product catalogue…';
-    const base = location.pathname.replace(/\/[^/]*$/, '');
-    const res = await fetch(base+'/master.json');
+    el.textContent='Downloading product catalogue… (one-time, ~9 MB)';
+    const base=location.pathname.replace(/\/[^/]*$/,'');
+    const res=await fetch(base+'/master.json');
     if(!res.ok) throw new Error('HTTP '+res.status);
-    const data = await res.json();
-    lsSet('wms_master', data);
+    const data=await res.json(); // {ean: {compact record}, …}
+    const records=Object.entries(data).map(([ean,r])=>({ean,...r}));
+    el.textContent=`Saving ${records.length.toLocaleString()} products…`;
+    await idbPutAll(records);
     localStorage.setItem('wms_master_version', MASTER_VERSION);
-    document.getElementById('masterStatus').textContent='';
+    el.textContent='';
     loadStats(); refreshSettingsIfOpen();
   }catch(e){
-    document.getElementById('masterStatus').textContent='Could not load catalogue — using cached data.';
+    el.textContent='Could not load catalogue — using cached data. ('+e.message+')';
   }
 }
-function localMaster(){ return lsGet('wms_master',{}); }
+
 function refreshSettingsIfOpen(){
   if(!document.getElementById('view-settings').classList.contains('hidden')) refreshSettings();
 }
-function localInv(){ return lsGet('wms_inventory',[]); }
 
 function initCloud(){
   const url=localStorage.getItem('wms_supa_url'), key=localStorage.getItem('wms_supa_key');
@@ -319,23 +384,19 @@ function initCloud(){
 const DB = {
   async getMaster(ean){
     if(CLOUD){ const {data}=await sb.from('material_master').select('*').eq('ean',ean).maybeSingle(); return data; }
-    const r=localMaster()[ean]; if(!r) return null;
-    // expand compact keys to full keys
-    return r.material_number ? r : {
-      ean:r.ean, material_number:r.mn, material_description:r.md,
-      division_code:r.dc, division_description:r.dc,
-      brand:r.br, product_category:r.pc,
-      product_category_segment:'', product_type:r.pt,
-      hsn_code:r.hsn, warranty_months:r.wm
-    };
+    // try exact EAN, then zero-padded (UPC-A 12→EAN-13), then strip leading zero
+    let r = await idbGet(ean);
+    if(!r && ean.length===12) r = await idbGet('0'+ean);
+    if(!r && ean.length===13 && ean[0]==='0') r = await idbGet(ean.slice(1));
+    return expandRecord(r);
   },
   async upsertMaster(rows){
     if(CLOUD){ for(let i=0;i<rows.length;i+=500){ await sb.from('material_master').upsert(rows.slice(i,i+500),{onConflict:'ean'}); } return; }
-    const m=localMaster(); rows.forEach(r=>m[r.ean]=r); lsSet('wms_master',m);
+    await idbPutAll(rows.map(r=>({ean:r.ean,...r})));
   },
   async masterCount(){
     if(CLOUD){ const {count}=await sb.from('material_master').select('*',{count:'exact',head:true}); return count||0; }
-    return Object.keys(localMaster()).length;
+    return idbCount();
   },
   async addInventory(row){
     if(CLOUD){ const {error}=await sb.from('warehouse_inventory').insert(row); if(error) throw error; return; }
@@ -690,7 +751,7 @@ function saveCloud(){ const u=document.getElementById('supaUrl').value.trim(),k=
   if(!u||!k) return toast('Enter both URL and key',false);
   localStorage.setItem('wms_supa_url',u); localStorage.setItem('wms_supa_key',k); initCloud(); toast(CLOUD?'Cloud enabled':'Invalid keys',CLOUD); loadStats(); }
 function clearCloud(){ localStorage.removeItem('wms_supa_url'); localStorage.removeItem('wms_supa_key'); CLOUD=false; sb=null; document.getElementById('modeChip').textContent='Local mode'; toast('Using local only'); refreshSettings(); loadStats(); }
-function resetLocal(){ if(confirm('Delete all locally-stored products and scans?')){ localStorage.removeItem('wms_master'); localStorage.removeItem('wms_inventory'); toast('Local data cleared'); loadStats(); refreshSettings(); } }
+async function resetLocal(){ if(confirm('Delete all locally-stored products and scans?')){ localStorage.removeItem('wms_master_version'); localStorage.removeItem('wms_inventory'); await idbClear(); toast('Local data cleared'); loadStats(); refreshSettings(); } }
 
 /* CSV import */
 function importMasterCsv(){
